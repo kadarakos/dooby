@@ -1,56 +1,40 @@
-import numpy as np
-
 from dataclasses import dataclass
-from typing import Set, List
-
-
-@dataclass
-class Cluster:
-    internal_points: Set[int]
-    boundary_points: Set[int]
-
-    def __post_init__(self):
-        self.points = set(self.internal_points).union(self.boundary_points)
-
-    def __len__(self):
-        return len(self.internal_points) + len(self.boundary_points)
-
-    def __contains__(self, element):
-        internal = element in self.internal_points
-        boundary = element in self.boundary_points
-        return internal or boundary
+from typing import Union, Sequence
+import numpy as np
 
 
 @dataclass
 class Clustering:
-    clusters: List[Cluster]
-    outliers: Set[int]
+    X: np.ndarray
+    assignment: np.ndarray
 
-    def __post_init__(self):
-        self.points = set()
-        for cluster in self.clusters:
-            self.points = self.points.union(cluster.points)
-        self.points = self.points.union(self.outliers)
-
-    @property
-    def has_outliers(self) -> bool:
-        return bool(self.outliers)
-
-    @property
-    def n_clusters(self) -> int:
-        return len(self.clusters) + int(self.has_outliers)
+    def __init__(self, X: np.ndarray, outlier=-99):
+        """
+        X: 2D array of points.
+        outliers: whether clustering contains outlier points.
+        """
+        if X.ndim != 2:
+            raise ValueError("X has to be a 2D array")
+        self.X = X
+        self.assignment = np.zeros(X.shape[0])
+        self.outlier = outlier
 
     @property
-    def n_points(self) -> int:
-        return len(self.points)
+    def clusters(self):
+        return np.unique(self.assignment)
 
-    def to_labels(self) -> List[int]:
-        labels = np.empty(self.n_points)
-        for label, cluster in enumerate(self.clusters):
-            for idx in cluster.points:
-                labels[idx] = label
-        if self.has_outliers:
-            label += 1
-            for idx in self.outliers:
-                labels[idx] = label
-        return labels
+    @property
+    def n_clusters(self):
+        return len(self.clusters)
+
+    def assign(self, idx: Union[int, Sequence[int]], cluster: int) -> None:
+        self.assignment[idx] = cluster
+
+    def add_outlier(self, idx: Union[int, Sequence[int]]) -> None:
+        self.assignment[idx] = self.outlier
+
+    def get_idxs(self, cluster: int) -> np.ndarray:
+        return np.where(self.assignment == cluster)[0]
+
+    def get_points(self, cluster: int) -> np.ndarray:
+        return self.X[self.get_idxs(cluster)]
